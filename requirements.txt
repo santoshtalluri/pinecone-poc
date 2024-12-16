@@ -14,3 +14,4 @@ simple-term-menu
 validators
 syntax
 prompt_toolkit
+tiktoken

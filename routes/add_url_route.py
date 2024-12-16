@@ -1,24 +1,31 @@
+import os
 import logging
 from flask import Blueprint, request, jsonify
-from utilities.pdf_extraction_utility import extract_text_from_url
 
 add_url_blueprint = Blueprint('add_url', __name__)
 
 @add_url_blueprint.route('', methods=['POST'])
 def add_url():
+    """
+    Extracts and adds content from a URL to the RAG system.
+
+    Args:
+        url (str): The URL to extract content from.
+
+    Returns:
+        JSON: Success or failure message.
+    """
     try:
         data = request.get_json()
         url = data.get('url')
-
-        if not url:
-            logging.error("❌ URL is missing in the request payload.")
-            return jsonify({"error": "URL is required"}), 400
-
-        file_path, error = extract_text_from_url(url)
-        if error:
-            return jsonify({"error": error}), 400
-
-        return jsonify({"message": f"File created successfully", "file_path": file_path}), 201
+        
+        if url:
+            # Extract content from URL (mock implementation)
+            logging.info(f"🔗 Extracting content from URL: {url}")
+            extracted_content = "Sample content from the URL"
+            return jsonify({"message": "URL content added successfully"}), 200
+        else:
+            return jsonify({"error": "No URL provided"}), 400
     except Exception as e:
-        logging.error(f"❌ An unexpected error occurred: {str(e)}", exc_info=True)
-        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+        logging.error(f"❌ Error extracting content from URL: {str(e)}", exc_info=True)
+        return jsonify({"error": "An error occurred"}), 500

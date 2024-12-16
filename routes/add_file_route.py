@@ -1,22 +1,27 @@
 import os
+import logging
 from flask import Blueprint, request, jsonify
-from rag_utils_from_files import create_rag_from_single_file
-from config import Config
 
 add_file_blueprint = Blueprint('add_file', __name__)
 
 @add_file_blueprint.route('', methods=['POST'])
 def add_file():
-    if 'file' not in request.files:
-        return jsonify({"error": "No file provided"}), 400
+    """
+    Add a new file to the RAG system.
 
-    file = request.files['file']
-    if file:
-        file_path = os.path.join(Config.DATA_FOLDER, file.filename)
-        file.save(file_path)
-        success = create_rag_from_single_file(file_path, Config.FAISS_INDEX_PATH)
-        
-        if success:
-            return jsonify({"message": f"File '{file.filename}' added successfully"}), 200
+    This route takes a file as input and stores it in the appropriate 
+    directory associated with the RAG.
+
+    Returns:
+        JSON: Success or failure message.
+    """
+    try:
+        file = request.files['file']
+        if file:
+            file.save(os.path.join(Config.DATA_FOLDER, file.filename))
+            return jsonify({"message": f"File {file.filename} uploaded successfully."}), 200
         else:
-            return jsonify({"error": "Failed to add file"}), 500
+            return jsonify({"error": "No file provided"}), 400
+    except Exception as e:
+        logging.error(f"❌ Error uploading file: {str(e)}", exc_info=True)
+        return jsonify({"error": "An error occurred"}), 500

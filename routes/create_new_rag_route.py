@@ -1,9 +1,9 @@
 import logging
 import os
+import uuid  # ✅ Import uuid to generate unique identifiers
 from flask import Blueprint, request, jsonify
-#from utilities.pdf_url_extraction_utility import extract_text_from_url
+from utilities.pdf_extraction_utility import extract_text_from_url
 from rag_utils_from_files import create_rag_system_from_files
-from utilities.pdf_extraction_utility import extract_text_from_pdf,extract_text_from_pdf_url,extract_text_from_url,extract_text_from_webpage
 from config import Config  # ✅ Import Config
 
 create_new_rag_blueprint = Blueprint('create_new_rag', __name__)
@@ -14,6 +14,7 @@ def create_new_rag():
         data = request.get_json()
         url = data.get('url')
         file_path = data.get('file_path')
+        rag_name = data.get('rag_name')  # New attribute to accept rag_name
 
         if not url and not file_path:
             return jsonify({"error": "Either 'url' or 'file_path' is required"}), 400
@@ -25,7 +26,8 @@ def create_new_rag():
                 return jsonify({"error": error}), 400
 
         folder_path = os.path.dirname(file_path)  # Get parent directory
-        unique_rag_folder = os.path.join(Config.FAISS_NEW_RAGS_PATH, f"rag_{int(os.path.getmtime(file_path))}")
+        rag_id = rag_name if rag_name else f"rag_{uuid.uuid4().hex}"  # Use rag_name if provided, otherwise generate one
+        unique_rag_folder = os.path.join(Config.FAISS_NEW_RAGS_PATH, rag_id)
         os.makedirs(unique_rag_folder, exist_ok=True)  # ✅ Ensure FAISS path exists
 
         logging.info(f"📁 Using folder path for RAG creation: {folder_path}")
