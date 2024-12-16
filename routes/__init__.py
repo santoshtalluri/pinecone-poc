@@ -10,6 +10,7 @@ from routes.view_rags_route import view_rags_blueprint
 from routes.delete_rag_route import delete_rag_blueprint
 from routes.set_default_rag_route import set_default_rag_blueprint
 from routes.get_default_rag_route import get_default_rag_blueprint
+from health.health import health_blueprint
 
 
 def register_blueprints(app: Flask):
@@ -33,5 +34,5 @@ def register_blueprints(app: Flask):
     app.register_blueprint(delete_rag_blueprint, url_prefix='/delete-rag') 
     app.register_blueprint(set_default_rag_blueprint, url_prefix='/set-default-rag')
     app.register_blueprint(get_default_rag_blueprint, url_prefix='/get-default-rag')
-
+    app.register_blueprint(health_blueprint, url_prefix='/health')
     return app

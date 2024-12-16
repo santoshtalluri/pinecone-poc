@@ -28,7 +28,7 @@ class Config:
     
     LOG_FILE_PATH = os.getenv('LOG_FILE_PATH', os.path.join(BASE_DIR, 'logs/errors.log'))  # Path to the log file
     
-    LOGGING_LEVEL = os.getenv('LOGGING_LEVEL', 'INFO')  # Set the logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    LOGGING_LEVEL = os.getenv('LOGGING_LEVEL', 'WARNING')  # Set the logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
     
     API_PORT = int(os.getenv('API_PORT', 5001))  # Port on which the Flask API server runs
     
