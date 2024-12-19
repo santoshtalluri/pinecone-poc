@@ -1,0 +1,30 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+# Logs and data files
+logs/
+*.faiss
+*.pkl
+
+# Environment and credentials
+.env
+
+# Byte-compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+
+# Exclude models and K8s folders
+models/
+k8s/
+
+# Exclude specific files
+**/cc.en.300.bin.gz
+**/cc.en.300.bin
+pinecone_search.py
+Miniconda3-latest-MacOSX-arm64.sh

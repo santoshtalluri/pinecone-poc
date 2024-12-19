@@ -1,0 +1,14 @@
+# docker-compose.yml
+version: '3.8'
+services:
+  app:
+    build: .
+    ports:
+      - "5001:5001"
+    environment:
+      - MONGO_URI=mongodb://mongo:27017
+      - PINECONE_API_KEY=${PINECONE_API_KEY}
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"

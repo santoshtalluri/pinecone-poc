@@ -5,8 +5,10 @@ import os
 import logging
 from langchain_community.vectorstores import FAISS
 from langchain_openai.embeddings import OpenAIEmbeddings
+from langchain.vectorstores import Pinecone
 from config import Config
 from rag_utils_from_files import create_rag_system_from_files
+import pinecone
 
 class VectorStoreInstance:
     """
@@ -30,25 +32,18 @@ class VectorStoreInstance:
         """
         if cls._instance is None:
             try:
-                # Path to the folder where the base RAG FAISS index is stored
-                base_rag_path = Config.FAISS_INDEX_PATH
-                logging.info(f"📂 Ensuring base RAG path exists: {base_rag_path}")
+                logging.info(f'🧠 Initializing Pinecone Vector Store...')
+                embeddings = OpenAIEmbeddings()
+                pinecone.init(api_key=os.getenv('PINECONE_API_KEY'))
+                index_name = os.getenv('PINECONE_INDEX_NAME')
+
+                if index_name not in pinecone.list_indexes():
+                    pinecone.create_index(index_name, dimension=1536)
                 
-                os.makedirs(base_rag_path, exist_ok=True)
-
-                index_path = os.path.join(base_rag_path, 'index.faiss')
-
-                if os.path.exists(index_path):
-                    logging.info(f'🧠 Loading FAISS vector store from {index_path}...')
-                    cls._instance = FAISS.load_local(
-                        base_rag_path, 
-                        embeddings=OpenAIEmbeddings(), 
-                        allow_dangerous_deserialization=True
-                    )
-                else:
-                    logging.info(f'📂 No FAISS index found. Building base RAG system from files in {Config.DATA_FOLDER}...')
-                    cls._instance, _ = create_rag_system_from_files(Config.DATA_FOLDER, base_rag_path)
+                index = pinecone.Index(index_name)
+                cls._instance = Pinecone(index, embeddings)
+                logging.info(f'✅ Connected to Pinecone index: {index_name}')
             except Exception as e:
-                logging.error(f'❌ Failed to initialize FAISS vector store: {str(e)}', exc_info=True)
+                logging.error(f'❌ Error initializing Pinecone vector store: {str(e)}', exc_info=True)
                 cls._instance = None
         return cls._instance

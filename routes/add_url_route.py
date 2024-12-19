@@ -1,31 +1,40 @@
-import os
 import logging
+import requests
 from flask import Blueprint, request, jsonify
+from langchain_community.embeddings import OpenAIEmbeddings
+from pinecone import Pinecone
+from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+import os
+load_dotenv()
 
+PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
+PINECONE_INDEX_NAME = os.getenv('PINECONE_INDEX_NAME')
+pc = Pinecone(api_key=PINECONE_API_KEY)
+index = pc.Index(PINECONE_INDEX_NAME)
+
+# Blueprint
 add_url_blueprint = Blueprint('add_url', __name__)
 
 @add_url_blueprint.route('', methods=['POST'])
 def add_url():
-    """
-    Extracts and adds content from a URL to the RAG system.
-
-    Args:
-        url (str): The URL to extract content from.
-
-    Returns:
-        JSON: Success or failure message.
-    """
+    """Add URL content to Pinecone."""
     try:
         data = request.get_json()
         url = data.get('url')
-        
-        if url:
-            # Extract content from URL (mock implementation)
-            logging.info(f"🔗 Extracting content from URL: {url}")
-            extracted_content = "Sample content from the URL"
-            return jsonify({"message": "URL content added successfully"}), 200
-        else:
-            return jsonify({"error": "No URL provided"}), 400
+
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        text = soup.get_text()
+
+        # Generate embeddings
+        embeddings = OpenAIEmbeddings()
+        vector_data = embeddings.embed_documents([text])
+
+        # Upload to Pinecone
+        response = index.upsert(vectors=[{"id": url, "values": vector_data[0]}])
+        logging.info(f"✅ URL {url} content added to Pinecone.")
+        return jsonify({"message": f"URL '{url}' added successfully."}), 200
     except Exception as e:
-        logging.error(f"❌ Error extracting content from URL: {str(e)}", exc_info=True)
-        return jsonify({"error": "An error occurred"}), 500
+        logging.error(f"❌ Error adding URL: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500

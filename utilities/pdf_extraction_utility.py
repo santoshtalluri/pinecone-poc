@@ -96,3 +96,22 @@ def extract_text_from_pdf(file_path):
     except Exception as e:
         logging.error(f'❌ Error extracting text from PDF {file_path}: {str(e)}', exc_info=True)
         return ''
+    
+def split_into_sections(text):
+    """
+    Split the content into logical sections using headers like Experience, Projects, Education, etc.
+    """
+    headers = ['Experience', 'Projects', 'Education', 'Career Experience', 'Notable Accomplishments']
+    pattern = '|'.join([f"\\b{header}\\b" for header in headers])
+    sections = re.split(pattern, text)
+    section_names = re.findall(pattern, text)
+
+    if len(sections) > len(section_names):  # ✅ Fix: Added section_names and colon
+        section_names.insert(0, "Introduction")
+
+    result = {}
+    for i, section_name in enumerate(section_names):
+        section_text = sections[i+1] if i+1 < len(sections) else ''
+        result[section_name.strip()] = section_text.strip()
+
+    return result

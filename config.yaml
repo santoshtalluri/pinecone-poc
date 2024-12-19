@@ -1,0 +1,47 @@
+# LLM Configuration
+llm:
+  provider: "openai"  # Options: openai, huggingface, cohere, etc.
+  model: "gpt-4"      # The model name to use (e.g., GPT-4, GPT-3.5-turbo)
+  api_key: "${OPENAI_API_KEY}"  # Pulled from .env or secret manager
+
+# Pinecone Configuration
+pinecone:
+  api_key: "${PINECONE_API_KEY}"   # API Key for Pinecone
+  index_name: "${PINECONE_INDEX_NAME}"  # Name of the index (default: rag-index)
+  region: "${PINECONE_REGION}"    # The Pinecone region (like us-east-1, gcp-starter)
+  host: "${PINECONE_HOST}"        # Direct host URL (optional, if auto-detect fails)
+
+# MongoDB Configuration
+mongodb:
+  uri: "mongodb://mongo:27017"  # Default local MongoDB instance (update for production)
+  database: "rag_database"      # Name of the database to use
+  collection: "rag_collection"  # Collection name where RAG metadata is stored
+
+# Embedding Configuration
+embeddings:
+  provider: "fasttext"  # Options: fasttext, openai, cohere, etc.
+  model_path: "/models/cc.en.300.bin"  # Path to local FastText model
+  dimension: 300  # FastText embedding size
+
+# Local Storage Options
+local_storage:
+  enabled: ${LOCAL_STORAGE}  # Enable local storage (e.g., for FAISS, file cache)
+  faiss_path: "faiss_index/index.faiss"  # Path for local FAISS index
+  file_cache_path: "data/extracted_from_url/"  # Directory for URL-extracted files
+
+# Rasa Configuration (optional, if using Rasa for Conversational AI)
+rasa:
+  enabled: true  # Enable Rasa integration
+  endpoint: "http://localhost:5005/webhooks/rest/webhook"  # Default Rasa endpoint
+
+# Logging Configuration
+logging:
+  level: "DEBUG"  # Log level: DEBUG, INFO, WARNING, ERROR
+  log_file: "logs/errors.log"  # Location of the log file
+
+# Health Check Configuration
+healthcheck:
+  check_pinecone: true
+  check_mongodb: true
+  check_rasa: true
+  check_llm: true

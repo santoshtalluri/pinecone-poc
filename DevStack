@@ -1,0 +1,83 @@
+Your tech stack has been updated and noted. Here's a quick breakdown of how this setup will come together and key points to focus on.
+
+	•	RAG: LangChain
+	•	Vector Store: Pinecone
+	•	Data Modeling: MongoDB
+	•	LLMs: Configurable (OpenAI, Hugging Face, etc.)
+	•	Conversational AI: Rasa
+	•	Embeddings: FastText
+	•	Deployment: Docker + Kubernetes
+
+
+1️⃣ RAG Creation - LangChain
+Why: LangChain provides modular support for RAG pipelines and makes it easy to integrate with LLMs, vector stores, and document loaders.
+Action:
+Use LangChain's Document Loaders to load data (PDFs, CSVs, URLs) into RAGs.
+Use Chains to create a document retriever with Pinecone.
+Use LLMChain to link your LLM (like GPT-4) to the retrieved documents.
+
+
+2️⃣ Vector Storage - Pinecone
+Why: Pinecone provides a fully managed, scalable, and low-latency vector store.
+Action:
+Store vector embeddings for every document or text you extract via LangChain.
+Ensure the metadata (like source name, path) is uploaded so you can retrieve context during queries.
+Important: Use index.upsert() to insert vectors with metadata.
+
+
+3️⃣ Data Modeling - MongoDB
+Why: MongoDB allows for flexible data models and supports storing JSON-like documents.
+Action:
+Use MongoDB to store metadata related to RAGs, such as:
+RAG Details (creation date, files used, embeddings used, etc.)
+LLM Configuration (track LLMs used to create the RAG).
+Conversation Logs (track Rasa conversations for feedback loops).
+Use Mongoose (Node.js) or PyMongo (Python) for integration.
+
+
+4️⃣ LLM Flexibility (GPT-4 and Beyond)
+Why: You want to switch between LLMs via configuration.
+Action:
+Create a config.yaml or .env file with LLM parameters (like model name, API key, and provider).
+Load LLM dynamically via LangChain's LLM abstraction.
+Sample LLM config in .env:
+env
+Copy code
+LLM_PROVIDER=openai  # openai, huggingface, cohere
+LLM_MODEL_NAME=gpt-4
+OPENAI_API_KEY=your_openai_api_key
+
+
+5️⃣ Conversational AI - Rasa
+Why: Rasa is a fully open-source conversational AI framework with support for intents, NLU, and RAG workflows.
+Action:
+Connect Rasa to the LLM pipeline to respond to user queries.
+Rasa can call your RAG system via REST API.
+When Rasa receives a query, it calls the RAG /ask endpoint to retrieve knowledge.
+
+
+6️⃣ Embedding Model - FastText
+Why: FastText provides lightweight, fast embeddings.
+Action:
+Use FastText to embed text into vectors.
+These embeddings will be stored in Pinecone.
+Replace OpenAIEmbeddings in LangChain with a custom embedding model using FastText.
+Example of embedding using FastText:
+python
+Copy code
+import fasttext.util
+
+fasttext.util.download_model('en', if_exists='ignore')  # Download the model
+ft = fasttext.load_model('cc.en.300.bin')
+
+def embed_text(text):
+    return ft.get_sentence_vector(text)  # Embed the text
+
+    
+7️⃣ Deployment - Docker + Kubernetes (K8s)
+Why: For scalability and reliability, you'll containerize the app with Docker and orchestrate it with K8s.
+Action:
+Create a Dockerfile to containerize the app.
+Use Docker Compose for local testing.
+Deploy to Kubernetes using a k8s deployment YAML.
+Use Kubernetes ConfigMaps to load API keys into pods.

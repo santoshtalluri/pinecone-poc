@@ -1,0 +1,1 @@
+from services.fasttext_service import get_fasttext_embeddings

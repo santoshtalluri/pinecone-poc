@@ -15,3 +15,12 @@ validators
 syntax
 prompt_toolkit
 tiktoken
+pymongo
+pydantic
+pinecone-client
+fasttext
+rasa
+pyyaml
+tree
+transformers
+torch
