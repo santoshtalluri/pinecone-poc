@@ -1,0 +1,35 @@
+from setuptools import setup
+
+setup(
+    name="pinecone-poc",
+    version="1.0",
+    install_requires=[
+        "requests",
+        "beautifulsoup4",
+        "langchain-community",
+        "faiss-cpu",
+        "python-dotenv",
+        "pdfminer.six",
+        "Flask",
+        "openai",
+        "halo",
+        "pypdf2",
+        "langchain_openai",
+        "inquirer",
+        "simple-term-menu",
+        "validators",
+        "syntax",
+        "prompt_toolkit",
+        "tiktoken",
+        "pymongo",
+        "pydantic",
+        "pinecone-client",
+        "fasttext",
+        "rasa",
+        "pyyaml",
+        "tree",
+        "transformers",
+        "torch"
+    ],
+    python_requires="==3.11"
+)

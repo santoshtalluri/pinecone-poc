@@ -22,5 +22,5 @@ fasttext
 rasa
 pyyaml
 tree
-transformers
-torch
+transformers; python_version == "3.11"
+torch; python_version == "3.11"

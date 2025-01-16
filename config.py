@@ -1,4 +1,8 @@
 import os
+from dotenv import load_dotenv
+
+# Load .env file
+load_dotenv()
 
 class Config:
     """Global Configuration Class
@@ -39,10 +43,44 @@ class Config:
     API_HOST = os.getenv('API_HOST', '0.0.0.0')  # Host IP for the Flask server
 
     PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
-    
-    PINECONE_INDEX_NAME = os.getenv('PINECONE_INDEX_NAME')
 
-    EMBEDDING_MODEL = "instructor-xl"  # Options: "openai", "bert", "fasttext", "mpnet", "instructor-xl"
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    
+    PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "default-index")
+
+    PINECONE_ENV = os.getenv("PINECONE_ENV", "us-east-1-aws")
+
+    PINECONE_INDEX_DIMENSION = 1024  # Update to match your Pinecone index dimension
+
+    EMBEDDING_MODEL = "openai"  # Options: "openai", "bert", "fasttext", "mpnet", "instructor-xl"
+
+    # Add INSTRUCTOR_MODEL_PATH
+    INSTRUCTOR_MODEL_PATH = os.getenv(
+        'INSTRUCTOR_MODEL_PATH',
+        os.path.join(BASE_DIR, 'models/hkunlp/instructor-xl')
+    )
+
+    # ================================
+    # OpenAI Embedding Model Configuration
+    # ================================
+
+    # Specify the embedding model name
+    # Example: "text-embedding-3-large" for OpenAI's advanced embedding model
+    # You can also switch to other models (e.g., "text-embedding-ada-002").
+    OPENAI_EMBEDDING_MODEL = "text-embedding-3-large"
+
+    # Specify the desired dimensions for the embedding model.
+    # Ensure this value matches your Pinecone or FAISS index dimensions.
+    # If left as None, the model will use its default dimensions (e.g., 1536 for text-embedding-3-large).
+    # Set to 1024 for compatibility with existing indices expecting 1024-dimensional vectors.
+    OPENAI_EMBEDDING_DIMENSIONS = 1024  # Adjust this to match your vector index
+
+    # Ollama Configuration
+    OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://127.0.0.1:11434')  # Default to local Ollama service
+    OLLAMA_EMBEDDING_MODEL = "mxbai-embed-large"  # Add this new config
+    OLLAMA_GENERATION_MODEL = "llama2"  # Model capable of text generation
+
+    LLM_MODEL = "openai"  # Options: "openai" for ChatGPT or "ollama" for local Ollama
     
     # ✅ NEW: FastText Configuration
     #HOME_DIRECTORY = os.path.expanduser('~')  # This will point to /Users/username or /home/username

@@ -5,12 +5,14 @@ __pycache__/
 .DS_Store
 
 # Logs and data files
-logs/
+Logs/error.log
 *.faiss
 *.pkl
 
 # Environment and credentials
 .env
+.MyVenv/
+data/
 
 # Byte-compiled files
 __pycache__/
