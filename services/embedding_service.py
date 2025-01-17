@@ -37,12 +37,12 @@ class EmbeddingService:
                 openai_api_key=Config.OPENAI_API_KEY
             )
         else:
-            raise ValueError(f"Unsupported embedding model: {Config.EMBEDDING_MODEL}")
+            raise ValueError(f"Unsupported embedding model: {Config.OPENAI_EMBEDDING_MODEL}")
 
         def generate_embedding(self, text):
-            return self.embedding_model.embed_text(text)
-        
-        self.embedding_model = Config.EMBEDDING_MODEL
+            return EMBEDDING_MODEL.embed_text(text)
+
+        self.embedding_model = Config.OPENAI_EMBEDDING_MODEL
         print ("$$$$$$$$$$$$$$$$$$$$")
         print(Config.OPENAI_EMBEDDING_MODEL)
         print ("$$$$$$$$$$$$$$$$$$$$")

@@ -17,10 +17,11 @@ view_rags_blueprint = Blueprint('view_rags', __name__)
 @view_rags_blueprint.route('', methods=['GET'])
 def view_rags():
     """
-    View all RAGs stored in Pinecone as indexes and namespaces.
-    Each RAG will display:
-    - RAG Name (either index name or namespace name)
-    - Total Vectors in that RAG
+    View all indexes stored in Pinecone.
+    Each index will display:
+    - Index Name
+    - Namespaces (if available)
+    - Total Vectors
     - Files Used to Create Vectors
     """
     try:
@@ -28,7 +29,8 @@ def view_rags():
         
         # Step 1: List all indexes available in Pinecone
         available_indexes = pc.list_indexes().names()
-        rags_info = []
+        total_indexes = len(available_indexes)
+        indexes_info = []
 
         for index_name in available_indexes:
             try:
@@ -38,29 +40,36 @@ def view_rags():
                 
                 namespaces = index_stats.get('namespaces', {})
                 total_vectors = sum(stats['vector_count'] for stats in namespaces.values())
+                namespace_info = []
 
                 for namespace, stats in namespaces.items():
                     file_names = get_file_names_from_pinecone(index, namespace)
-                    rags_info.append({
-                        "rag_name": f"{index_name}::{namespace}" if namespace else index_name,
-                        "index_name": index_name,
+                    namespace_info.append({
                         "namespace": namespace if namespace else "default",
                         "total_vectors": stats['vector_count'],
-                        "files_used": file_names  # ✅ Display file names that contributed to this RAG
+                        "files_used": file_names
                     })
+
+                indexes_info.append({
+                    "index_name": index_name,
+                    "total_vectors": total_vectors,
+                    "namespaces": namespace_info
+                })
 
             except Exception as e:
                 logging.error(f"❌ Error retrieving namespace stats for index {index_name}: {str(e)}", exc_info=True)
-                rags_info.append({
-                    "rag_name": index_name,
+                indexes_info.append({
                     "index_name": index_name,
                     "error": f"Failed to retrieve stats for {index_name}"
                 })
 
-        return jsonify({"available_rags": rags_info}), 200
+        return jsonify({
+            "total_indexes": total_indexes,
+            "available_indexes": indexes_info
+        }), 200
 
     except Exception as e:
-        logging.error(f"❌ Error viewing Pinecone RAGs: {str(e)}", exc_info=True)
+        logging.error(f"❌ Error viewing Pinecone indexes: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
@@ -72,7 +81,7 @@ def get_file_names_from_pinecone(index, namespace):
         logging.info(f"📘 Querying Pinecone for file names in namespace: {namespace}")
         response = index.query(
             vector=[0] * 1536,  # Dummy vector for query
-            top_k=1000,  # Return 1000 results
+            top_k=1000,  # Return up to 1000 results
             namespace=namespace,
             include_metadata=True
         )

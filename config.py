@@ -46,14 +46,58 @@ class Config:
 
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     
-    PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "default-index")
+    PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "my-resume4")
 
-    PINECONE_ENV = os.getenv("PINECONE_ENV", "us-east-1-aws")
+    PINECONE_ENV = os.getenv("PINECONE_ENV", "us-east-1")
 
     PINECONE_INDEX_DIMENSION = 1024  # Update to match your Pinecone index dimension
 
     EMBEDDING_MODEL = "openai"  # Options: "openai", "bert", "fasttext", "mpnet", "instructor-xl"
+    OPENAI_EMBEDDING_MODEL = "text-embedding-3-large"
+    OLLAMA_EMBEDDING_MODEL = "mxbai-embed-large"  # Add this new config
+    #OPENAI_EMBEDDING_DIMENSIONS = 3072  # Example dimension for OpenAI
+    #OLLAMA_EMBEDDING_DIMENSIONS = 1042  # Example dimension for Ollama
 
+    # Supported embedding models
+    EMBEDDING_MODEL = "openai"  # Current embedding model
+    OPENAI_EMBEDDING_MODEL = "text-embedding-3-large"
+    OLLAMA_EMBEDDING_MODEL = "mxbai-embed-large"
+    FASTTEXT_MODEL_PATH = os.getenv('FASTTEXT_MODEL_PATH', os.path.join(BASE_DIR, 'cc.en.300.bin'))
+
+
+    @staticmethod
+    def get_index_dimensions():
+        """Determine the index dimensions based on the embedding model."""
+        if Config.EMBEDDING_MODEL == "openai" and Config.OPENAI_EMBEDDING_MODEL == "text-embedding-3-large":
+            return 3072
+        elif Config.EMBEDDING_MODEL == "ollama" and Config.OLLAMA_EMBEDDING_MODEL == "mxbai-embed-large":
+            return 1042
+        else:
+            raise ValueError(f"Unsupported embedding model configuration: {Config.EMBEDDING_MODEL}")
+
+    @staticmethod
+    def get_embedding_config():
+        """
+        Returns the embedding model configuration based on the EMBEDDING_MODEL attribute.
+        """
+        if Config.EMBEDDING_MODEL == "openai":
+            return {
+                "model_name": Config.OPENAI_EMBEDDING_MODEL,
+                "dimensions": 3072,  # Example dimension for OpenAI text-embedding-3-large
+            }
+        elif Config.EMBEDDING_MODEL == "ollama":
+            return {
+                "model_name": Config.OLLAMA_EMBEDDING_MODEL,
+                "dimensions": 1042,  # Example dimension for mxbai-embed-large
+            }
+        elif Config.EMBEDDING_MODEL == "fasttext":
+            return {
+                "model_path": Config.FASTTEXT_MODEL_PATH,
+                "dimensions": 300,  # FastText typically uses 300 dimensions
+            }
+        else:
+            raise ValueError(f"Unsupported embedding model: {Config.EMBEDDING_MODEL}")
+            
     # Add INSTRUCTOR_MODEL_PATH
     INSTRUCTOR_MODEL_PATH = os.getenv(
         'INSTRUCTOR_MODEL_PATH',
@@ -67,20 +111,20 @@ class Config:
     # Specify the embedding model name
     # Example: "text-embedding-3-large" for OpenAI's advanced embedding model
     # You can also switch to other models (e.g., "text-embedding-ada-002").
-    OPENAI_EMBEDDING_MODEL = "text-embedding-3-large"
+    
 
     # Specify the desired dimensions for the embedding model.
     # Ensure this value matches your Pinecone or FAISS index dimensions.
     # If left as None, the model will use its default dimensions (e.g., 1536 for text-embedding-3-large).
     # Set to 1024 for compatibility with existing indices expecting 1024-dimensional vectors.
-    OPENAI_EMBEDDING_DIMENSIONS = 1024  # Adjust this to match your vector index
+    #OPENAI_EMBEDDING_DIMENSIONS = 1024  # Adjust this to match your vector index
 
     # Ollama Configuration
     OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://127.0.0.1:11434')  # Default to local Ollama service
-    OLLAMA_EMBEDDING_MODEL = "mxbai-embed-large"  # Add this new config
+    
     OLLAMA_GENERATION_MODEL = "llama2"  # Model capable of text generation
 
-    LLM_MODEL = "openai"  # Options: "openai" for ChatGPT or "ollama" for local Ollama
+    LLM_MODEL = "ollama"  # Options: "openai" for ChatGPT or "ollama" for local Ollama
     
     # ✅ NEW: FastText Configuration
     #HOME_DIRECTORY = os.path.expanduser('~')  # This will point to /Users/username or /home/username

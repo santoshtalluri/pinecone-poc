@@ -1,205 +1,212 @@
-import logging
-import requests
-from flask import Blueprint, request, jsonify
-from services.embedding_service import EmbeddingService, adjust_embedding_dimensions
-from services.pinecone_service import get_pinecone_index
-from sklearn.metrics.pairwise import cosine_similarity
-from dotenv import load_dotenv
 import os
-import re
-import openai
+import logging
+from flask import Blueprint, request, jsonify
+from services.pinecone_service import get_pinecone_index
+from services.embedding_service import EmbeddingService
 from config import Config
-import json
+from dotenv import load_dotenv
+import openai
+from nltk.tokenize import sent_tokenize
+from sklearn.metrics.pairwise import cosine_similarity
 
 # Load environment variables
 load_dotenv()
 
-# Set OpenAI API Key if OpenAI is the selected LLM
-if Config.LLM_MODEL == "openai":
-    OPENAI_API_KEY = Config.OPENAI_API_KEY
-    openai.api_key = OPENAI_API_KEY
-
-# Configure logging for token usage
-token_log_path = '/Users/santoshtalluri/Documents/MyDevProjects/pinecone-poc/logs/token_usage.log'
-logging.basicConfig(
-    filename=token_log_path,
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-
 ask_blueprint = Blueprint('ask', __name__)
+
+DEFAULT_RAG_FILE = "/Users/santoshtalluri/Documents/MyDevProjects/pinecone-poc/default_rag.txt"
+
+def get_default_rag():
+    """
+    Retrieve the current default RAG from the default_rag.txt file.
+    """
+    try:
+        if os.path.exists(DEFAULT_RAG_FILE):
+            with open(DEFAULT_RAG_FILE, "r") as f:
+                return f.read().strip()
+        return None
+    except Exception as e:
+        logging.error(f"❌ Error reading default RAG: {str(e)}")
+        return None
+
+def sanitize_query_with_chatgpt(query):
+    """
+    Use ChatGPT API to sanitize the query.
+    """
+    try:
+        openai.api_key = Config.OPENAI_API_KEY
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "Sanitize the following query for accurate information retrieval."},
+                {"role": "user", "content": query}
+            ],
+            max_tokens=400
+        )
+        return response['choices'][0]['message']['content'].strip()
+    except Exception as e:
+        logging.error(f"❌ Error sanitizing query with ChatGPT API: {str(e)}")
+        raise
+
+def advanced_chunking(text, chunk_size=512, overlap=50):
+    """
+    Chunk text into overlapping segments using sentence boundaries.
+    """
+    sentences = sent_tokenize(text)
+    chunks = []
+    current_chunk = []
+    current_length = 0
+
+    for sentence in sentences:
+        if current_length + len(sentence) > chunk_size:
+            chunks.append(" ".join(current_chunk))
+            current_chunk = current_chunk[-overlap:]  # Retain overlap
+            current_length = sum(len(s) for s in current_chunk)
+        current_chunk.append(sentence)
+        current_length += len(sentence)
+
+    if current_chunk:
+        chunks.append(" ".join(current_chunk))
+
+    return chunks
+
+def rerank_documents(query_embedding, documents):
+    """
+    Rerank documents based on cosine similarity to the query embedding.
+    """
+    for doc in documents:
+        doc_vector = doc['metadata'].get('vector', [])  # Assume vector is stored in metadata
+        doc['similarity'] = cosine_similarity([query_embedding], [doc_vector])[0][0] if doc_vector else 0
+    return sorted(documents, key=lambda x: x['similarity'], reverse=True)
+
+# Initialize EmbeddingService
+embedding_service = EmbeddingService()
+
+def sanitize_and_embed_query(query):
+    """
+    Sanitize the query using ChatGPT API and generate its embedding.
+    """
+    try:
+        # Sanitize query with ChatGPT
+        sanitized_query = sanitize_query_with_chatgpt(query)
+        logging.info(f"✅ Sanitized query: {sanitized_query}")
+
+        # Generate embedding for sanitized query
+        query_embedding = embedding_service.generate_embeddings(sanitized_query)
+        logging.info(f"✅ Generated query embedding.")
+        return query_embedding
+    except Exception as e:
+        logging.error(f"❌ Error sanitizing or embedding query: {str(e)}")
+        raise
 
 @ask_blueprint.route('', methods=['POST'])
 def ask():
     try:
-        # Parse request data
         data = request.get_json()
         query = data.get('query')
-        namespace = data.get('rag_name')
 
         if not query:
-            logging.error("❌ No query provided.")
-            return jsonify({"error": "No query provided"}), 400
+            logging.error("❌ Query is missing from the request payload.")
+            return jsonify({"error": "Query is required."}), 400
 
-        if not namespace:
-            logging.error("❌ No namespace provided.")
-            return jsonify({"error": "Namespace (rag_name) is required."}), 400
+        # Sanitize and embed the query
+        query_embedding = sanitize_and_embed_query(query)
 
-        # Generate query embedding
-        logging.info(f"🧠 Generating embedding for query: {query}")
-        embedding_service = EmbeddingService()
-        embedding = embedding_service.generate_embeddings(query)
+        # Initialize Pinecone index
+        rag_name = get_default_rag()
+        index = get_pinecone_index(index_name=rag_name)
+        if not index:
+            logging.error(f"❌ Failed to retrieve the Pinecone index: {rag_name}")
+            return jsonify({"error": f"Index '{rag_name}' not found."}), 404
 
-        # Adjust embedding dimensions to match Pinecone index
-        #embedding = adjust_embedding_dimensions(embedding, Config.PINECONE_INDEX_DIMENSION)
+        # Query across all namespaces
+        logging.info(f"🔍 Querying Pinecone index: {rag_name} across all namespaces.")
+        index_stats = index.describe_index_stats()
+        namespaces = index_stats.get("namespaces", {}).keys()
 
-        # Debug raw embedding
-        logging.info(f"Generated raw embedding: {embedding}")
-        logging.info(f"Generated raw embedding dimensions: {len(embedding)}")
+        if not namespaces:
+            logging.warning("⚠️ No namespaces found in the index.")
+            return jsonify({
+                "response": "No relevant information found in the index.",
+                "rag_name": rag_name,
+                "tokens_used": 0
+            }), 200
 
-        # Adjust embedding dimensions to match Pinecone index
-        logging.info(f"Original embedding dimensions: {len(embedding)}")
-        embedding = adjust_embedding_dimensions(embedding, Config.PINECONE_INDEX_DIMENSION)
-        logging.info(f"Final embedding sent to Pinecone: {embedding}")
-        logging.info(f"Final embedding dimensions: {len(embedding)}")
+        all_matches = []
+        for namespace in namespaces:
+            logging.info(f"🔍 Querying namespace: {namespace}")
+            search_results = index.query(
+                vector=query_embedding,
+                top_k=5,  # Adjust as needed
+                include_metadata=True,
+                namespace=namespace
+            )
+            matches = search_results.get('matches', [])
+            logging.info(f"Matches for namespace {namespace}: {matches}")
+            all_matches.extend(matches)
 
-        if embedding is None or not isinstance(embedding, list):
-            logging.error("❌ Failed to generate embedding for the query.")
-            return jsonify({"error": "Failed to generate embedding for the query."}), 500
+        # Log all retrieved matches
+        logging.info(f"All matches retrieved: {all_matches}")
 
-        # Query Pinecone for context
-        logging.info(f"🔍 Querying Pinecone with namespace: {namespace}")
-        index = get_pinecone_index()
-        if index is None:
-            logging.error("❌ Pinecone index connection failed.")
-            return jsonify({"error": "Failed to connect to Pinecone index."}), 500
+        # Evaluate retrieved documents
+        relevant_docs = [doc for doc in all_matches if doc['score'] >= 0.3]  # Reduced threshold
+        if not relevant_docs:
+            logging.warning("⚠️ No documents matched the query.")
+            return jsonify({
+                "response": "No relevant information found. Please refine your query.",
+                "rag_name": rag_name,
+                "tokens_used": 0
+            }), 200
 
-        response = index.query(
-            vector=embedding,
-            top_k=50,
-            namespace=namespace,
-            include_metadata=True
+        # Rerank retrieved documents
+        reranked_docs = rerank_documents(query_embedding, relevant_docs)
+
+        # Format results with more detail
+        formatted_matches = [
+            {
+                "file_name": match['metadata'].get('file_name', 'Unknown File'),
+                "content_snippet": match['metadata'].get('content', 'No content available'),
+                "score": match['score']
+            }
+            for match in reranked_docs
+        ]
+
+        consolidated_content = "\n\n".join(
+            f"File: {match['file_name']}\n"
+            f"Content Snippet: {match['content_snippet']}\n"
+            f"Relevance Score: {match['score']}"
+            for match in formatted_matches
         )
 
-        # Retrieve matches
-        matches = response.get('matches', [])
-        if not matches:
-            logging.warning("⚠️ No matches found in Pinecone for the query.")
-            return jsonify({"response": "No relevant information found in the RAG system."}), 200
+        chatgpt_prompt = (
+            f"Sanitized Query: {query}\n\n"
+            "The following are the top matches for this query, retrieved from multiple namespaces and files:\n"
+            f"{consolidated_content}\n\n"
+            "Generate a detailed response summarizing the relevant information. Ensure the response is concise and user-friendly."
+        )
 
-        # Re-rank matches dynamically
-        context_embeddings = [
-            adjust_embedding_dimensions(
-                embedding_service.generate_embeddings(match.get('metadata', {}).get('content', '')),
-                Config.PINECONE_INDEX_DIMENSION
-            ) for match in matches
-        ]
-        similarities = cosine_similarity([embedding], context_embeddings).flatten()
-        adaptive_threshold = max(0.4, similarities.mean() - similarities.std())
-        filtered_matches = [
-            match for match, similarity in zip(matches, similarities) if similarity >= adaptive_threshold
-        ]
+        # Pass the prompt to ChatGPT
+        logging.info("🤖 Generating response using ChatGPT.")
+        chatgpt_response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "Generate a detailed and user-friendly response based on the input."},
+                {"role": "user", "content": chatgpt_prompt}
+            ],
+            max_tokens=1000
+        )
+        final_response = chatgpt_response['choices'][0]['message']['content'].strip()
+        tokens_used = chatgpt_response['usage']['total_tokens']
 
-        if not filtered_matches:
-            logging.warning("⚠️ No high-confidence matches found in the RAG system.")
-            return jsonify({"response": "No relevant information found in the RAG system."}), 200
+        logging.info(f"✅ Final Response: {final_response}")
+        logging.info(f"🔢 Tokens used: {tokens_used}")
 
-        # Combine context from top-ranked matches
-        ranked_matches = sorted(zip(filtered_matches, similarities), key=lambda x: x[1], reverse=True)
-        top_contexts = [match[0].get('metadata', {}).get('content', '') for match in ranked_matches[:10]]
-        context = "\n\n".join(top_contexts)
-
-        # Log the combined context
-        logging.info(f"🔍 Re-ranked context (first 500 chars): {context[:500]}...")
-
-        # Enhanced function to extract amounts near relevant phrases
-        def extract_amount(context):
-            # Search for key phrases and amounts nearby
-            match = re.search(r"(total amount paid|this month's charges|since your last bill).*?\$([\d,]+\.\d{2})", context, re.IGNORECASE)
-            if match:
-                return match.group(2)
-            return None
-
-        # Check if the query specifically asks for the total amount paid
-        if "total amount paid" in query.lower():
-            amount = extract_amount(context)
-            if amount:
-                return jsonify({"response": f"The total amount paid is ${amount}."}), 200
-
-        # Generate response using LLM
-        if Config.LLM_MODEL == "openai":
-            logging.info("🧠 Using OpenAI ChatGPT for response generation.")
-            prompt = f"""
-            You are a highly intelligent assistant. The user has asked the following question: '{query}'.
-            Here is some context retrieved from a document related to the question:
-            {context}
-
-            Based on this context, provide a clear and accurate response to the user's question.
-            """
-            chatgpt_response = openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=500
-            )
-            answer = chatgpt_response.choices[0].message.content
-            total_tokens_used = chatgpt_response['usage']['total_tokens']
-            response_message = f"{answer}\n\nThis response used {total_tokens_used} tokens."
-
-        elif Config.LLM_MODEL == "ollama":
-            logging.info("🧠 Using Ollama for response generation.")
-            if Config.OLLAMA_GENERATION_MODEL is None:
-                logging.error("❌ Ollama generation model is not specified in Config.")
-                return jsonify({"error": "Ollama generation model is not configured."}), 500
-
-            url = f"{Config.OLLAMA_HOST}/api/generate"
-            payload = {
-                "model": Config.OLLAMA_GENERATION_MODEL,
-                "prompt": f"""
-                You are a smart assistant. The user has asked the following question: '{query}'.
-                Here is some context related to the question from the RAG system:
-                {context}
-
-                Based on this context, provide a clear and detailed response to the user's question.
-                """
-            }
-            headers = {"Content-Type": "application/json"}
-
-            try:
-                response = requests.post(url, json=payload, stream=True)
-                if response.status_code != 200:
-                    logging.error(f"❌ Ollama API error: {response.text}")
-                    return jsonify({"error": "Failed to generate a response using Ollama."}), 500
-
-                full_response = ""
-                for line in response.iter_lines(decode_unicode=True):
-                    if line.strip():
-                        try:
-                            parsed_line = json.loads(line)
-                            if "response" in parsed_line:
-                                full_response += parsed_line["response"]
-                            if parsed_line.get("done", False):
-                                break
-                        except json.JSONDecodeError as e:
-                            logging.warning(f"⚠️ Skipping invalid JSON line: {line}. Error: {str(e)}")
-
-                if not full_response.strip():
-                    raise ValueError("No valid response generated from Ollama.")
-
-                response_message = full_response.strip()
-            except Exception as e:
-                logging.error(f"❌ Error processing Ollama's response: {str(e)}", exc_info=True)
-                return jsonify({"error": "Failed to parse Ollama's response."}), 500
-
-        else:
-            logging.error(f"❌ Unsupported LLM model specified: {Config.LLM_MODEL}")
-            return jsonify({"error": f"Unsupported LLM model: {Config.LLM_MODEL}"}), 400
-
-        logging.info(f"🧠 Generated response: {response_message[:200]}...")
-        return jsonify({"response": response_message}), 200
+        return jsonify({
+            "response": final_response,
+            "rag_name": rag_name,
+            "tokens_used": tokens_used
+        }), 200
 
     except Exception as e:
-        logging.error(f"❌ Unexpected error: {str(e)}", exc_info=True)
-        return jsonify({"error": "An unexpected error occurred while processing your query."}), 500
+        logging.error(f"❌ Error in ask endpoint: {str(e)}", exc_info=True)
+        return jsonify({"error": "An unexpected error occurred."}), 500

@@ -1,0 +1,12 @@
+
+
+# API Key for OpenAI (replace with your actual key)
+OPENAI_API_KEY=
+PINECONE_API_KEY=
+PINECONE_INDEX_NAME=
+PINECONE_ENV=
+PINECONE_REGION=
+PINECONE_HOST=
+
+
+
